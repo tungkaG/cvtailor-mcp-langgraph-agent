@@ -236,3 +236,120 @@ class TestGraphNodes:
 
         assert "evidence" in result
         assert isinstance(result["evidence"], list)
+
+
+class TestEvidenceScoring:
+    """Tests for the evidence scoring node."""
+
+    def test_score_evidence_no_evidence_gives_weak_quality(self) -> None:
+        """No evidence should give weak quality."""
+        from cvtailor_agent.graph import score_resume_evidence
+
+        state: CVTailorState = {
+            "company": "Test",
+            "role": "Test",
+            "job_file": "test.txt",
+            "evidence": [],
+        }
+
+        result = score_resume_evidence(state)
+
+        assert result["evidence_score"] == 0.0
+        assert result["evidence_quality"] == "weak"
+        assert "No resume evidence found" in result["route_reason"]
+
+    def test_score_evidence_none_evidence_gives_weak_quality(self) -> None:
+        """None evidence should give weak quality."""
+        from cvtailor_agent.graph import score_resume_evidence
+
+        state: CVTailorState = {
+            "company": "Test",
+            "role": "Test",
+            "job_file": "test.txt",
+            "evidence": None,
+        }
+
+        result = score_resume_evidence(state)
+
+        assert result["evidence_score"] == 0.0
+        assert result["evidence_quality"] == "weak"
+
+    def test_score_evidence_high_score_gives_strong_quality(self) -> None:
+        """High-score evidence should give strong quality."""
+        from cvtailor_agent.graph import score_resume_evidence
+
+        state: CVTailorState = {
+            "company": "Test",
+            "role": "Test",
+            "job_file": "test.txt",
+            "evidence": [
+                {"text": "Python experience", "score": 0.85},
+                {"text": "LangGraph workflow", "score": 0.75},
+                {"text": "API development", "score": 0.60},
+            ],
+        }
+
+        result = score_resume_evidence(state)
+
+        assert result["evidence_score"] >= 0.50
+        assert result["evidence_quality"] == "strong"
+        assert ">= 0.50" in result["route_reason"]
+
+    def test_score_evidence_low_score_gives_weak_quality(self) -> None:
+        """Low-score evidence should give weak quality."""
+        from cvtailor_agent.graph import score_resume_evidence
+
+        state: CVTailorState = {
+            "company": "Test",
+            "role": "Test",
+            "job_file": "test.txt",
+            "evidence": [
+                {"text": "Some text", "score": 0.20},
+                {"text": "Other text", "score": 0.30},
+                {"text": "More text", "score": 0.25},
+            ],
+        }
+
+        result = score_resume_evidence(state)
+
+        assert result["evidence_score"] < 0.50
+        assert result["evidence_quality"] == "weak"
+        assert "< 0.50" in result["route_reason"]
+
+    def test_score_evidence_exactly_threshold_gives_strong(self) -> None:
+        """Evidence at exactly 0.50 threshold should give strong quality."""
+        from cvtailor_agent.graph import score_resume_evidence
+
+        state: CVTailorState = {
+            "company": "Test",
+            "role": "Test",
+            "job_file": "test.txt",
+            "evidence": [
+                {"text": "Some text", "score": 0.50},
+            ],
+        }
+
+        result = score_resume_evidence(state)
+
+        assert result["evidence_score"] == 0.50
+        assert result["evidence_quality"] == "strong"
+
+    def test_score_evidence_missing_scores_gives_weak(self) -> None:
+        """Evidence items without scores should give weak quality."""
+        from cvtailor_agent.graph import score_resume_evidence
+
+        state: CVTailorState = {
+            "company": "Test",
+            "role": "Test",
+            "job_file": "test.txt",
+            "evidence": [
+                {"text": "No score field"},
+                {"text": "Also no score"},
+            ],
+        }
+
+        result = score_resume_evidence(state)
+
+        assert result["evidence_score"] == 0.0
+        assert result["evidence_quality"] == "weak"
+        assert "no scores" in result["route_reason"]

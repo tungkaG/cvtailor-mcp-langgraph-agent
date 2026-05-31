@@ -1,19 +1,20 @@
 """LangGraph workflow definition for CVTailor agent.
 
-This module defines the agent workflow as a LangGraph StateGraph with 9 nodes:
+This module defines the agent workflow as a LangGraph StateGraph with 10 nodes:
 1. load_job_description - Load job description from file
 2. extract_requirements_with_llm - Extract key requirements using LLM
 3. get_candidate_profile_from_mcp - Get profile via MCP tool
 4. search_resume_evidence_from_mcp - Search resume via MCP tool
-5. generate_application_pack_with_llm - Generate initial draft
-6. review_application_pack_with_llm - Review the draft
-7. improve_application_pack_with_llm - Improve based on feedback
-8. save_application_pack_with_mcp - Save final pack via MCP
-9. log_application_with_mcp - Log to database via MCP
+5. score_resume_evidence - Score evidence quality for routing
+6. generate_application_pack_with_llm - Generate initial draft
+7. review_application_pack_with_llm - Review the draft
+8. improve_application_pack_with_llm - Improve based on feedback
+9. save_application_pack_with_mcp - Save final pack via MCP
+10. log_application_with_mcp - Log to database via MCP
 
 Graph flow:
 START -> load_job_description -> extract_requirements -> get_profile ->
-search_evidence -> generate_draft -> review -> improve -> save -> log -> END
+search_evidence -> score_evidence -> generate_draft -> review -> improve -> save -> log -> END
 """
 
 from __future__ import annotations
@@ -128,6 +129,61 @@ def search_resume_evidence_from_mcp(state: CVTailorState) -> dict:
     evidence = client.search_resume_evidence(search_query, top_k=5)
 
     return {"evidence": evidence}
+
+
+def score_resume_evidence(state: CVTailorState) -> dict:
+    """Score the quality of resume evidence for conditional routing.
+
+    Calculates an average score from evidence items and assigns a quality label.
+    This enables the graph to route differently based on evidence strength.
+
+    Args:
+        state: Current workflow state with evidence list.
+
+    Returns:
+        Updated state with evidence_score, evidence_quality, and route_reason.
+    """
+    evidence = state.get("evidence") or []
+
+    # No evidence case
+    if not evidence:
+        return {
+            "evidence_score": 0.0,
+            "evidence_quality": "weak",
+            "route_reason": "No resume evidence found",
+        }
+
+    # Calculate average score from evidence items
+    scores = []
+    for item in evidence:
+        # Only include scores that are explicitly present
+        if "score" in item:
+            score = item["score"]
+            if isinstance(score, (int, float)):
+                scores.append(float(score))
+
+    if not scores:
+        return {
+            "evidence_score": 0.0,
+            "evidence_quality": "weak",
+            "route_reason": "Evidence items have no scores",
+        }
+
+    average_score = sum(scores) / len(scores)
+
+    # Determine quality based on threshold
+    if average_score >= 0.50:
+        quality = "strong"
+        reason = f"Evidence score {average_score:.2f} >= 0.50 threshold"
+    else:
+        quality = "weak"
+        reason = f"Evidence score {average_score:.2f} < 0.50 threshold"
+
+    return {
+        "evidence_score": average_score,
+        "evidence_quality": quality,
+        "route_reason": reason,
+    }
 
 
 def generate_application_pack_with_llm(state: CVTailorState) -> dict:
@@ -369,6 +425,7 @@ def build_graph() -> "CompiledStateGraph":
     graph.add_node("extract_requirements", extract_requirements_with_llm)
     graph.add_node("get_profile", get_candidate_profile_from_mcp)
     graph.add_node("search_evidence", search_resume_evidence_from_mcp)
+    graph.add_node("score_evidence", score_resume_evidence)
     graph.add_node("generate_draft", generate_application_pack_with_llm)
     graph.add_node("review_draft", review_application_pack_with_llm)
     graph.add_node("improve_draft", improve_application_pack_with_llm)
@@ -380,7 +437,8 @@ def build_graph() -> "CompiledStateGraph":
     graph.add_edge("load_job_description", "extract_requirements")
     graph.add_edge("extract_requirements", "get_profile")
     graph.add_edge("get_profile", "search_evidence")
-    graph.add_edge("search_evidence", "generate_draft")
+    graph.add_edge("search_evidence", "score_evidence")
+    graph.add_edge("score_evidence", "generate_draft")
     graph.add_edge("generate_draft", "review_draft")
     graph.add_edge("review_draft", "improve_draft")
     graph.add_edge("improve_draft", "save_pack")
