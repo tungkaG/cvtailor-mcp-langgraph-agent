@@ -26,6 +26,7 @@ from langgraph.graph import StateGraph, START, END
 
 from cvtailor_agent.llm import get_llm
 from cvtailor_agent.mcp_client import MCPClient
+from cvtailor_agent.output_formatter import format_application_pack
 from cvtailor_agent.prompts import (
     REQUIREMENT_EXTRACTION_PROMPT,
     DRAFT_APPLICATION_PROMPT,
@@ -220,7 +221,14 @@ def improve_application_pack_with_llm(state: CVTailorState) -> dict:
 
     improved = llm.invoke(prompt)
 
-    return {"final_application_pack": improved}
+    formatted_pack = format_application_pack(
+        {
+            **state,
+            "final_application_pack": improved,
+        }
+    )
+
+    return {"final_application_pack": formatted_pack}
 
 
 def save_application_pack_with_mcp(state: CVTailorState) -> dict:

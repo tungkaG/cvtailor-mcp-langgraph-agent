@@ -9,7 +9,19 @@ import pytest
 
 from cvtailor_agent.graph import build_graph
 from cvtailor_agent.state import CVTailorState
-from cvtailor_mcp.schemas import DATABASE_PATH, OUTPUTS_DIR
+
+
+REQUIRED_MARKDOWN_HEADINGS = [
+    "# Application Pack: {role} at {company}",
+    "## Job Requirement Summary",
+    "## Candidate Match Score",
+    "## Matched Skills Table",
+    "## Tailored Resume Summary",
+    "## Tailored Resume Bullets",
+    "## Short Cover Letter",
+    "## Gap Analysis",
+    "## Next Actions",
+]
 
 
 # Get path to example job description
@@ -72,6 +84,7 @@ class TestGraphInvoke:
         assert result["output_path"] is not None
         assert "application_id" in result
         assert result["application_id"] is not None
+        assert result["output_path"].endswith("acme-ai-ai-engineer-application-pack.md")
 
     def test_graph_invoke_populates_all_fields(self) -> None:
         """Graph invoke should populate all state fields."""
@@ -99,6 +112,14 @@ class TestGraphInvoke:
         assert result.get("output_path") is not None
         assert result.get("application_id") is not None
 
+        expected_title = REQUIRED_MARKDOWN_HEADINGS[0].format(
+            role=initial_state["role"],
+            company=initial_state["company"],
+        )
+        assert expected_title in result["final_application_pack"]
+        for heading in REQUIRED_MARKDOWN_HEADINGS[1:]:
+            assert heading in result["final_application_pack"]
+
     def test_graph_invoke_creates_output_file(self) -> None:
         """Graph invoke should create an output file on disk."""
         if not EXAMPLE_JOB_FILE.exists():
@@ -122,6 +143,14 @@ class TestGraphInvoke:
         # Verify file has content
         content = Path(output_path).read_text(encoding="utf-8")
         assert len(content) > 0
+
+        expected_title = REQUIRED_MARKDOWN_HEADINGS[0].format(
+            role=initial_state["role"],
+            company=initial_state["company"],
+        )
+        assert expected_title in content
+        for heading in REQUIRED_MARKDOWN_HEADINGS[1:]:
+            assert heading in content
 
     def test_graph_invoke_file_not_found(self) -> None:
         """Graph invoke should raise FileNotFoundError for missing job file."""
