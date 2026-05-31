@@ -1,0 +1,53 @@
+AI Engineer - LLM Applications
+
+Company: Acme AI
+Location: Berlin, Germany (Hybrid)
+Employment Type: Full-time
+
+About Acme AI
+
+Acme AI is a fast-growing startup building intelligent automation tools for enterprise customers. We leverage cutting-edge LLM technology to create AI assistants that help businesses streamline their workflows and make better decisions.
+
+Role Overview
+
+We are looking for an AI Engineer to join our growing team. You will design, build, and deploy LLM-powered applications that solve real business problems. This role involves working closely with product, data science, and engineering teams to deliver production-ready AI solutions.
+
+Responsibilities
+
+- Design and implement LLM-based applications using modern frameworks
+- Build and maintain agent workflows for complex multi-step tasks
+- Develop APIs and backend services to serve AI models
+- Integrate with databases and external services
+- Write clean, tested, and documented code
+- Participate in code reviews and technical discussions
+- Stay current with AI/ML research and best practices
+
+Requirements
+
+- 2+ years of experience with Python
+- Strong understanding of LLMs and prompt engineering
+- Experience with LangChain, LangGraph, or similar LLM frameworks
+- Proficiency with SQL databases (PostgreSQL, SQLite)
+- Experience building REST APIs (FastAPI, Flask, or Django)
+- Familiarity with version control (Git) and CI/CD practices
+- Strong problem-solving and communication skills
+
+Nice to Have
+
+- Experience with Model Context Protocol (MCP)
+- Familiarity with Hugging Face Transformers and model deployment
+- Experience with Docker and containerized deployments
+- Knowledge of RAG pipelines and vector databases
+- Contributions to open-source AI/ML projects
+
+What We Offer
+
+- Competitive salary and equity package
+- Flexible hybrid work arrangement
+- Learning budget for conferences and courses
+- Modern tech stack and greenfield projects
+- Collaborative and inclusive team culture
+
+To Apply
+
+Send your resume and a brief cover letter explaining why you're excited about AI engineering and what projects you've worked on.

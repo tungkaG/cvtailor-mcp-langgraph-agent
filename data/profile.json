@@ -1,0 +1,23 @@
+{
+  "name": "Alex Chen",
+  "title": "AI Engineer / Python Developer",
+  "email": "alex.chen@example.com",
+  "location": "Berlin, Germany",
+  "summary": "Aspiring AI Engineer with hands-on experience building LLM-powered applications using Python, LangGraph, LangChain, and the Model Context Protocol (MCP). Passionate about creating intelligent automation tools and agent-based workflows.",
+  "skills": [
+    "Python",
+    "LangGraph",
+    "LangChain",
+    "MCP",
+    "Hugging Face",
+    "SQL",
+    "FastAPI",
+    "Docker",
+    "GitHub Actions",
+    "SQLite"
+  ],
+  "experience_years": 2,
+  "languages": ["English", "German"],
+  "github": "https://github.com/alexchen",
+  "linkedin": "https://linkedin.com/in/alexchen"
+}
