@@ -7,7 +7,7 @@ from unittest import mock
 
 import pytest
 
-from cvtailor_agent.llm import MockLLM, get_llm
+from cvtailor_agent.llm import MockLLM, HuggingFaceLLM, get_llm
 from cvtailor_agent.prompts import (
     DRAFT_APPLICATION_PROMPT,
     IMPROVE_PROMPT,
@@ -21,8 +21,9 @@ class TestGetLLM:
 
     def test_get_llm_returns_mock_by_default(self) -> None:
         """get_llm should return MockLLM when no provider specified."""
-        llm = get_llm()
-        assert isinstance(llm, MockLLM)
+        with mock.patch.dict(os.environ, {}, clear=True):
+            llm = get_llm()
+            assert isinstance(llm, MockLLM)
 
     def test_get_llm_returns_mock_when_specified(self) -> None:
         """get_llm should return MockLLM when provider='mock'."""
@@ -35,11 +36,49 @@ class TestGetLLM:
             llm = get_llm()
             assert isinstance(llm, MockLLM)
 
-    def test_get_llm_huggingface_not_implemented(self) -> None:
-        """get_llm should raise NotImplementedError for huggingface."""
-        with pytest.raises(NotImplementedError) as exc_info:
-            get_llm(provider="huggingface")
-        assert "Hugging Face" in str(exc_info.value)
+    def test_get_llm_huggingface_without_token_raises_error(self) -> None:
+        """get_llm should raise ValueError for huggingface without HF_TOKEN."""
+        # Ensure HF_TOKEN is not set
+        env = {"LLM_PROVIDER": "huggingface"}
+        if "HF_TOKEN" in os.environ:
+            env["HF_TOKEN"] = ""
+
+        with mock.patch.dict(os.environ, env, clear=False):
+            # Clear HF_TOKEN if it exists
+            with mock.patch.dict(os.environ, {"HF_TOKEN": ""}, clear=False):
+                with pytest.raises(ValueError) as exc_info:
+                    get_llm(provider="huggingface")
+                assert "HF_TOKEN" in str(exc_info.value)
+
+    def test_get_llm_huggingface_with_token_returns_huggingface_llm(self) -> None:
+        """get_llm should return HuggingFaceLLM when HF_TOKEN is set."""
+        with mock.patch.dict(os.environ, {"HF_TOKEN": "test_token_123"}):
+            llm = get_llm(provider="huggingface")
+            assert isinstance(llm, HuggingFaceLLM)
+            # Verify token was stored (without printing it)
+            assert llm.token is not None
+
+    def test_huggingface_invoke_uses_chat_completions(self) -> None:
+        """HuggingFaceLLM should use chat completions for conversational models."""
+        llm = HuggingFaceLLM.__new__(HuggingFaceLLM)
+        llm.token = "test_token_123"
+        llm.model_id = "mistralai/Mistral-7B-Instruct-v0.3"
+        llm.temperature = 0.2
+        llm.max_new_tokens = 900
+        llm._client = None
+        llm._endpoint = None
+
+        message = mock.Mock(content="chat response")
+        choice = mock.Mock(message=message)
+        response = mock.Mock(choices=[choice])
+        client = mock.Mock()
+        client.chat.completions.create.return_value = response
+
+        with mock.patch.object(llm, "_get_client", return_value=client):
+            result = llm.invoke("Explain the role requirements")
+
+        assert result == "chat response"
+        client.chat.completions.create.assert_called_once()
 
     def test_get_llm_unknown_provider_raises_error(self) -> None:
         """get_llm should raise ValueError for unknown provider."""

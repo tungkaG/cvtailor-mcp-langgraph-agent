@@ -2,19 +2,25 @@
 
 This module provides:
 - MockLLM for local demos and testing
+- HuggingFaceLLM for real LLM calls via Hugging Face Inference API
 - LLM provider factory with environment-based selection
-- Hugging Face integration (planned for later phase)
 """
 
 from __future__ import annotations
 
 import os
-from typing import Protocol
+from typing import Any, Protocol
 
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+
+
+# Default Hugging Face model and parameters
+DEFAULT_HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"
+DEFAULT_TEMPERATURE = 0.2
+DEFAULT_MAX_NEW_TOKENS = 900
 
 
 class LLMProtocol(Protocol):
@@ -185,6 +191,131 @@ Key points:
 - Replace with real LLM for production use"""
 
 
+class HuggingFaceLLM:
+    """Hugging Face LLM using Inference Providers chat completions.
+
+    Modern instruct models on Hugging Face providers are frequently exposed as
+    conversational/chat workloads rather than plain text-generation. This class
+    keeps the local `invoke(prompt) -> str` contract while routing requests
+    through Hugging Face chat completions first, with a text-generation
+    fallback for older compatible deployments.
+
+    Environment variables:
+        HF_TOKEN: Hugging Face API token (required)
+        HF_MODEL: Model ID (default: mistralai/Mistral-7B-Instruct-v0.3)
+        TEMPERATURE: Sampling temperature (default: 0.2)
+        MAX_NEW_TOKENS: Maximum tokens to generate (default: 900)
+    """
+
+    def __init__(self) -> None:
+        """Initialize the Hugging Face LLM.
+
+        Raises:
+            ValueError: If HF_TOKEN is not set.
+        """
+        # Get token - required
+        self.token = os.getenv("HF_TOKEN")
+        if not self.token:
+            raise ValueError(
+                "HF_TOKEN environment variable is required for Hugging Face mode. "
+                "Set it in your .env file or environment."
+            )
+
+        # Get model and parameters
+        self.model_id = os.getenv("HF_MODEL", DEFAULT_HF_MODEL)
+        self.temperature = float(os.getenv("TEMPERATURE", str(DEFAULT_TEMPERATURE)))
+        self.max_new_tokens = int(os.getenv("MAX_NEW_TOKENS", str(DEFAULT_MAX_NEW_TOKENS)))
+
+        # Lazy initialization of clients
+        self._client = None
+        self._endpoint = None
+
+    def _get_client(self) -> Any:
+        """Lazily initialize the Hugging Face inference client.
+
+        Returns:
+            InferenceClient instance.
+        """
+        if self._client is None:
+            from huggingface_hub import InferenceClient
+
+            self._client = InferenceClient(api_key=self.token)
+        return self._client
+
+    def _get_endpoint(self) -> Any:
+        """Lazily initialize the HuggingFaceEndpoint fallback.
+
+        Returns:
+            HuggingFaceEndpoint instance.
+        """
+        if self._endpoint is None:
+            from langchain_huggingface import HuggingFaceEndpoint
+
+            self._endpoint = HuggingFaceEndpoint(
+                repo_id=self.model_id,
+                huggingfacehub_api_token=self.token,
+                temperature=self.temperature,
+                max_new_tokens=self.max_new_tokens,
+            )
+        return self._endpoint
+
+    def _invoke_with_chat_completions(self, prompt: str) -> str:
+        """Invoke the model using Hugging Face chat completions.
+
+        Args:
+            prompt: The input prompt text.
+
+        Returns:
+            Generated response text.
+        """
+        client = self._get_client()
+        response = client.chat.completions.create(
+            model=self.model_id,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            temperature=self.temperature,
+            max_tokens=self.max_new_tokens,
+        )
+        return response.choices[0].message.content or ""
+
+    def _invoke_with_endpoint(self, prompt: str) -> str:
+        """Invoke the model using text-generation fallback."""
+        endpoint = self._get_endpoint()
+        response = endpoint.invoke(prompt)
+
+        if isinstance(response, str):
+            return response
+
+        return str(response)
+
+    def invoke(self, prompt: str) -> str:
+        """Generate a response using the Hugging Face Inference API.
+
+        Args:
+            prompt: The input prompt text.
+
+        Returns:
+            Generated text from the model.
+        """
+        try:
+            return self._invoke_with_chat_completions(prompt)
+        except Exception as chat_error:
+            try:
+                return self._invoke_with_endpoint(prompt)
+            except Exception as endpoint_error:
+                raise RuntimeError(
+                    "Hugging Face request failed. The selected model may not be "
+                    "available for either chat completions or text generation on "
+                    "your configured provider. Try a conversational model deployed "
+                    "in Hugging Face Inference Providers or set HF_MODEL to a known "
+                    "compatible model."
+                ) from endpoint_error
+
+
 def get_llm(provider: str | None = None) -> LLMProtocol:
     """Get an LLM instance based on provider configuration.
 
@@ -199,8 +330,7 @@ def get_llm(provider: str | None = None) -> LLMProtocol:
         An LLM instance implementing LLMProtocol.
 
     Raises:
-        NotImplementedError: If provider is 'huggingface' (planned for later).
-        ValueError: If provider is unknown.
+        ValueError: If provider is unknown or HF_TOKEN is missing for huggingface.
     """
     if provider is None:
         provider = os.getenv("LLM_PROVIDER", "mock")
@@ -210,10 +340,7 @@ def get_llm(provider: str | None = None) -> LLMProtocol:
     if provider == "mock":
         return MockLLM()
     elif provider == "huggingface":
-        raise NotImplementedError(
-            "Hugging Face LLM integration will be added in a later phase. "
-            "Set LLM_PROVIDER=mock for now."
-        )
+        return HuggingFaceLLM()
     else:
         raise ValueError(
             f"Unknown LLM provider: {provider}. "

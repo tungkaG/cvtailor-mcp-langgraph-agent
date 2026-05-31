@@ -30,6 +30,44 @@ pip install -e ".[dev]"
 cp .env.example .env
 ```
 
+## LLM Configuration
+
+The agent supports two LLM modes:
+
+### Mock Mode (Default)
+
+No API keys required. Returns deterministic responses for testing and demos.
+
+```bash
+# .env
+LLM_PROVIDER=mock
+```
+
+### Hugging Face Mode
+
+Uses Hugging Face Inference API for real LLM responses.
+
+1. Get a Hugging Face API token from https://huggingface.co/settings/tokens
+2. Configure your `.env` file:
+
+```bash
+# .env
+LLM_PROVIDER=huggingface
+HF_TOKEN=your_token_here
+HF_MODEL=mistralai/Mistral-7B-Instruct-v0.3
+TEMPERATURE=0.2
+MAX_NEW_TOKENS=900
+```
+
+**Environment Variables:**
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `LLM_PROVIDER` | No | `mock` | LLM provider: `mock` or `huggingface` |
+| `HF_TOKEN` | Yes (for HF) | - | Hugging Face API token |
+| `HF_MODEL` | No | `mistralai/Mistral-7B-Instruct-v0.3` | Model ID |
+| `TEMPERATURE` | No | `0.2` | Sampling temperature |
+| `MAX_NEW_TOKENS` | No | `900` | Max tokens to generate |
+
 ## Demo Command
 
 ```bash
