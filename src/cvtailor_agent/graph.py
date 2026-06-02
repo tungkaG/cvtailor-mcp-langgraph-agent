@@ -308,6 +308,51 @@ def search_resume_evidence_again(state: CVTailorState) -> dict:
 # -----------------------------------------------------------------------------
 
 
+def parse_review_response(response: str) -> tuple[str, str]:
+    """Parse the structured review response from the LLM.
+
+    Extracts the review status and feedback from the LLM response.
+    Expected format:
+        REVIEW_STATUS: approved
+        FEEDBACK:
+        ...
+
+    Args:
+        response: The raw LLM review response.
+
+    Returns:
+        Tuple of (status, feedback) where status is 'approved' or 'needs_revision'.
+        Defaults to 'needs_revision' if parsing fails.
+    """
+    status = "needs_revision"  # Default if parsing fails
+    feedback = response  # Use full response as feedback by default
+
+    # Look for REVIEW_STATUS line
+    lines = response.split("\n")
+    for i, line in enumerate(lines):
+        line_stripped = line.strip().upper()
+        if line_stripped.startswith("REVIEW_STATUS:"):
+            # Extract status value
+            status_value = line.split(":", 1)[1].strip().lower()
+            if "approved" in status_value:
+                status = "approved"
+            else:
+                status = "needs_revision"
+
+            # Extract feedback (everything after REVIEW_STATUS line)
+            remaining_lines = lines[i + 1 :]
+            # Skip empty lines and look for FEEDBACK header
+            feedback_start = 0
+            for j, fline in enumerate(remaining_lines):
+                if fline.strip().upper().startswith("FEEDBACK"):
+                    feedback_start = j + 1
+                    break
+            feedback = "\n".join(remaining_lines[feedback_start:]).strip()
+            break
+
+    return status, feedback
+
+
 def generate_application_pack_with_llm(state: CVTailorState) -> dict:
     """Generate initial application pack draft using LLM.
 
@@ -348,11 +393,13 @@ def generate_application_pack_with_llm(state: CVTailorState) -> dict:
 def review_application_pack_with_llm(state: CVTailorState) -> dict:
     """Review application pack and provide feedback using LLM.
 
+    Parses the structured response to extract review status and feedback.
+
     Args:
         state: Current workflow state with draft_application_pack.
 
     Returns:
-        Updated state with review_feedback.
+        Updated state with review_status and review_feedback.
     """
     llm = get_llm()
 
@@ -368,9 +415,15 @@ def review_application_pack_with_llm(state: CVTailorState) -> dict:
         role=state["role"],
     )
 
-    feedback = llm.invoke(prompt)
+    response = llm.invoke(prompt)
 
-    return {"review_feedback": feedback}
+    # Parse structured response
+    status, feedback = parse_review_response(response)
+
+    return {
+        "review_status": status,
+        "review_feedback": feedback,
+    }
 
 
 def improve_application_pack_with_llm(state: CVTailorState) -> dict:

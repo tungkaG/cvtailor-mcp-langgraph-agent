@@ -134,8 +134,10 @@ Best regards,
 [Candidate Name]"""
 
     def _review_response(self) -> str:
-        """Return mock review response."""
-        return """## Draft Review
+        """Return mock review response with structured status."""
+        return """REVIEW_STATUS: approved
+
+FEEDBACK:
 
 ### Strengths
 - Clear structure and professional tone
@@ -150,8 +152,8 @@ Best regards,
 - Consider adding a brief mention of company research
 
 ### Overall Assessment
-The draft is solid but could be enhanced with more specifics and metrics.
-Score: 7/10
+The draft is well-written and demonstrates strong alignment with the role.
+Score: 8/10
 
 ### Priority Suggestions
 1. Add specific metrics (e.g., "improved model accuracy by 25%")

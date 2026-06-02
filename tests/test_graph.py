@@ -549,3 +549,80 @@ class TestSearchResumeEvidenceAgain:
 
         assert "evidence" in result
         assert isinstance(result["evidence"], list)
+
+
+class TestParseReviewResponse:
+    """Tests for the parse_review_response function."""
+
+    def test_parse_approved_status(self) -> None:
+        """Should parse approved status correctly."""
+        from cvtailor_agent.graph import parse_review_response
+
+        response = """REVIEW_STATUS: approved
+
+FEEDBACK:
+The draft is excellent and ready to send.
+Score: 9/10"""
+
+        status, feedback = parse_review_response(response)
+
+        assert status == "approved"
+        assert "excellent" in feedback
+
+    def test_parse_needs_revision_status(self) -> None:
+        """Should parse needs_revision status correctly."""
+        from cvtailor_agent.graph import parse_review_response
+
+        response = """REVIEW_STATUS: needs_revision
+
+FEEDBACK:
+The draft needs more specific examples.
+Score: 6/10"""
+
+        status, feedback = parse_review_response(response)
+
+        assert status == "needs_revision"
+        assert "specific examples" in feedback
+
+    def test_parse_fallback_to_needs_revision(self) -> None:
+        """Should default to needs_revision if parsing fails."""
+        from cvtailor_agent.graph import parse_review_response
+
+        response = """This response has no structured format.
+Just some general feedback about the draft."""
+
+        status, feedback = parse_review_response(response)
+
+        assert status == "needs_revision"
+        assert "general feedback" in feedback
+
+    def test_parse_case_insensitive_status(self) -> None:
+        """Should handle case variations in status."""
+        from cvtailor_agent.graph import parse_review_response
+
+        response = """review_status: APPROVED
+
+FEEDBACK:
+Great work!"""
+
+        status, feedback = parse_review_response(response)
+
+        assert status == "approved"
+
+    def test_parse_extracts_feedback_after_header(self) -> None:
+        """Should extract feedback text after FEEDBACK header."""
+        from cvtailor_agent.graph import parse_review_response
+
+        response = """REVIEW_STATUS: approved
+
+FEEDBACK:
+### Strengths
+- Good structure
+### Areas for Improvement
+- Add metrics"""
+
+        status, feedback = parse_review_response(response)
+
+        assert status == "approved"
+        assert "Strengths" in feedback
+        assert "Good structure" in feedback

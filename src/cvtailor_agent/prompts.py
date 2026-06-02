@@ -73,13 +73,19 @@ Job Requirements:
 Draft to Review:
 {draft}
 
-Please evaluate and provide feedback on:
+Please evaluate the draft and provide your response in this exact format:
 
+REVIEW_STATUS: [approved OR needs_revision]
+
+FEEDBACK:
 1. Strengths - What works well in this draft?
 2. Areas for Improvement - What could be better?
 3. Alignment with Requirements - How well does it address the job requirements?
 4. Overall Assessment - Rating out of 10 with justification
 5. Priority Suggestions - Top 3 specific changes to make
+
+Use REVIEW_STATUS: approved if the draft is ready to send (score 8/10 or higher).
+Use REVIEW_STATUS: needs_revision if improvements are needed (score below 8/10).
 
 Be specific and actionable in your feedback.""",
 )
