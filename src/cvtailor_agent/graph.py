@@ -224,6 +224,32 @@ def route_after_evidence_scoring(state: CVTailorState) -> str:
     return "weak_match"
 
 
+def route_after_review(state: CVTailorState) -> str:
+    """Route based on review classification and revision limits.
+
+    Determines whether the workflow can save immediately, needs another
+    improvement pass, or must stop revising because the maximum number of
+    revisions has been reached.
+
+    Args:
+        state: Current workflow state with review_status and revision_count.
+
+    Returns:
+        Route key: "approved", "needs_revision", or "max_revisions_reached".
+    """
+    review_status = state.get("review_status", "unknown")
+    revision_count = state.get("revision_count", 0)
+    max_revisions = state.get("max_revisions", 2)
+
+    if review_status == "approved":
+        return "approved"
+
+    if revision_count >= max_revisions:
+        return "max_revisions_reached"
+
+    return "needs_revision"
+
+
 # -----------------------------------------------------------------------------
 # Fallback Search Nodes
 # -----------------------------------------------------------------------------
@@ -433,7 +459,8 @@ def improve_application_pack_with_llm(state: CVTailorState) -> dict:
         state: Current workflow state with draft and feedback.
 
     Returns:
-        Updated state with final_application_pack.
+        Updated state with final_application_pack, draft_application_pack,
+        and incremented revision_count.
     """
     llm = get_llm()
 
@@ -459,7 +486,11 @@ def improve_application_pack_with_llm(state: CVTailorState) -> dict:
         }
     )
 
-    return {"final_application_pack": formatted_pack}
+    return {
+        "draft_application_pack": formatted_pack,
+        "final_application_pack": formatted_pack,
+        "revision_count": state.get("revision_count", 0) + 1,
+    }
 
 
 def save_application_pack_with_mcp(state: CVTailorState) -> dict:
@@ -585,6 +616,7 @@ def build_graph() -> "CompiledStateGraph":
     - Strong evidence proceeds directly to generation
     - Weak evidence triggers broadened search (up to max_search_attempts)
     - After max attempts, continues with best available evidence
+    - Review classification can trigger a bounded improve/review loop
 
     Returns:
         Compiled LangGraph StateGraph ready for invocation.
@@ -636,10 +668,24 @@ def build_graph() -> "CompiledStateGraph":
     graph.add_edge("broaden_search", "search_evidence_again")
     graph.add_edge("search_evidence_again", "score_evidence")
 
-    # Generation through completion
+    # Generation through review
     graph.add_edge("generate_draft", "review_draft")
-    graph.add_edge("review_draft", "improve_draft")
-    graph.add_edge("improve_draft", "save_pack")
+
+    # Conditional routing after review classification
+    graph.add_conditional_edges(
+        "review_draft",
+        route_after_review,
+        {
+            "approved": "save_pack",
+            "max_revisions_reached": "save_pack",
+            "needs_revision": "improve_draft",
+        },
+    )
+
+    # Bounded revision loop
+    graph.add_edge("improve_draft", "review_draft")
+
+    # Completion
     graph.add_edge("save_pack", "log_application")
     graph.add_edge("log_application", END)
 

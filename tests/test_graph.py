@@ -626,3 +626,139 @@ FEEDBACK:
         assert status == "approved"
         assert "Strengths" in feedback
         assert "Good structure" in feedback
+
+
+class TestReviewRouting:
+    """Tests for conditional routing after review classification."""
+
+    def test_router_approved_routes_to_save(self) -> None:
+        """Approved review status should route to approved."""
+        from cvtailor_agent.graph import route_after_review
+
+        state: CVTailorState = {
+            "company": "Test",
+            "role": "Test",
+            "job_file": "test.txt",
+            "review_status": "approved",
+            "revision_count": 0,
+            "max_revisions": 2,
+        }
+
+        route = route_after_review(state)
+
+        assert route == "approved"
+
+    def test_router_needs_revision_routes_to_improve(self) -> None:
+        """needs_revision status with revisions remaining should route to needs_revision."""
+        from cvtailor_agent.graph import route_after_review
+
+        state: CVTailorState = {
+            "company": "Test",
+            "role": "Test",
+            "job_file": "test.txt",
+            "review_status": "needs_revision",
+            "revision_count": 0,
+            "max_revisions": 2,
+        }
+
+        route = route_after_review(state)
+
+        assert route == "needs_revision"
+
+    def test_router_max_revisions_routes_to_save(self) -> None:
+        """needs_revision at max revisions should route to max_revisions_reached."""
+        from cvtailor_agent.graph import route_after_review
+
+        state: CVTailorState = {
+            "company": "Test",
+            "role": "Test",
+            "job_file": "test.txt",
+            "review_status": "needs_revision",
+            "revision_count": 2,
+            "max_revisions": 2,
+        }
+
+        route = route_after_review(state)
+
+        assert route == "max_revisions_reached"
+
+    def test_router_uses_default_max_revisions(self) -> None:
+        """Router should use default max_revisions if not set."""
+        from cvtailor_agent.graph import route_after_review
+
+        state: CVTailorState = {
+            "company": "Test",
+            "role": "Test",
+            "job_file": "test.txt",
+            "review_status": "needs_revision",
+            "revision_count": 2,
+            # max_revisions not set - should default to 2
+        }
+
+        route = route_after_review(state)
+
+        assert route == "max_revisions_reached"
+
+    def test_router_unknown_status_routes_to_needs_revision(self) -> None:
+        """Unknown review status should route to needs_revision."""
+        from cvtailor_agent.graph import route_after_review
+
+        state: CVTailorState = {
+            "company": "Test",
+            "role": "Test",
+            "job_file": "test.txt",
+            "review_status": "unknown",
+            "revision_count": 0,
+            "max_revisions": 2,
+        }
+
+        route = route_after_review(state)
+
+        assert route == "needs_revision"
+
+
+class TestImproveNode:
+    """Tests for the improve_application_pack_with_llm node."""
+
+    def test_improve_increments_revision_count(self) -> None:
+        """improve_application_pack_with_llm should increment revision_count."""
+        from cvtailor_agent.graph import improve_application_pack_with_llm
+        import os
+
+        os.environ["LLM_PROVIDER"] = "mock"
+
+        state: CVTailorState = {
+            "company": "Test",
+            "role": "Engineer",
+            "job_file": "test.txt",
+            "draft_application_pack": "Initial draft",
+            "review_feedback": "Add more details",
+            "requirements": "Python, SQL",
+            "revision_count": 0,
+        }
+
+        result = improve_application_pack_with_llm(state)
+
+        assert result["revision_count"] == 1
+
+    def test_improve_updates_draft_for_loop(self) -> None:
+        """improve_application_pack_with_llm should update draft_application_pack."""
+        from cvtailor_agent.graph import improve_application_pack_with_llm
+        import os
+
+        os.environ["LLM_PROVIDER"] = "mock"
+
+        state: CVTailorState = {
+            "company": "Test",
+            "role": "Engineer",
+            "job_file": "test.txt",
+            "draft_application_pack": "Initial draft",
+            "review_feedback": "Add more details",
+            "requirements": "Python, SQL",
+            "revision_count": 1,
+        }
+
+        result = improve_application_pack_with_llm(state)
+
+        assert "draft_application_pack" in result
+        assert result["revision_count"] == 2
