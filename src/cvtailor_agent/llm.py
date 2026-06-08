@@ -18,7 +18,7 @@ load_dotenv()
 
 
 # Default Hugging Face model and parameters
-DEFAULT_HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"
+DEFAULT_HF_MODEL = "Qwen/Qwen2.5-72B-Instruct"
 DEFAULT_TEMPERATURE = 0.2
 DEFAULT_MAX_NEW_TOKENS = 900
 
@@ -305,7 +305,7 @@ class HuggingFaceLLM:
         """
         try:
             return self._invoke_with_chat_completions(prompt)
-        except Exception as chat_error:
+        except Exception:
             try:
                 return self._invoke_with_endpoint(prompt)
             except Exception as endpoint_error:

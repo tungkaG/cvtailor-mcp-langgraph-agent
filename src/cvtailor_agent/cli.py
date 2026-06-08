@@ -77,12 +77,33 @@ def run(
 
             progress.update(task, description="[green]✓[/green] Application generated!")
 
-        # Display results
+        # Display results with workflow details
         console.print()
+
+        # Extract workflow decision fields
+        evidence_score = result.get("evidence_score", 0.0)
+        evidence_quality = result.get("evidence_quality", "unknown")
+        search_attempts = result.get("search_attempts", 0)
+        review_status = result.get("review_status", "unknown")
+        revision_count = result.get("revision_count", 0)
+        output_path = result.get("output_path", "N/A")
+        application_id = result.get("application_id", "N/A")
+
+        # Color-code quality and status
+        quality_color = "green" if evidence_quality == "strong" else "yellow"
+        status_color = "green" if review_status == "approved" else "yellow"
+
         console.print(Panel.fit(
             f"[bold green]Success![/bold green]\n\n"
-            f"Output Path: [cyan]{result.get('output_path', 'N/A')}[/cyan]\n"
-            f"Application ID: [yellow]{result.get('application_id', 'N/A')}[/yellow]",
+            f"[bold]Workflow Decisions:[/bold]\n"
+            f"  Evidence Quality: [{quality_color}]{evidence_quality}[/{quality_color}]\n"
+            f"  Evidence Score: [cyan]{evidence_score:.2f}[/cyan]\n"
+            f"  Search Attempts: [cyan]{search_attempts}[/cyan]\n"
+            f"  Review Status: [{status_color}]{review_status}[/{status_color}]\n"
+            f"  Revision Count: [cyan]{revision_count}[/cyan]\n\n"
+            f"[bold]Output:[/bold]\n"
+            f"  Path: [cyan]{output_path}[/cyan]\n"
+            f"  Application ID: [yellow]{application_id}[/yellow]",
             title="Results",
         ))
 

@@ -54,7 +54,7 @@ Uses Hugging Face Inference API for real LLM responses.
 # .env
 LLM_PROVIDER=huggingface
 HF_TOKEN=your_token_here
-HF_MODEL=mistralai/Mistral-7B-Instruct-v0.3
+HF_MODEL=Qwen/Qwen2.5-72B-Instruct
 TEMPERATURE=0.2
 MAX_NEW_TOKENS=900
 ```
@@ -64,7 +64,7 @@ MAX_NEW_TOKENS=900
 |----------|----------|---------|-------------|
 | `LLM_PROVIDER` | No | `mock` | LLM provider: `mock` or `huggingface` |
 | `HF_TOKEN` | Yes (for HF) | - | Hugging Face API token |
-| `HF_MODEL` | No | `mistralai/Mistral-7B-Instruct-v0.3` | Model ID |
+| `HF_MODEL` | No | `Qwen/Qwen2.5-72B-Instruct` | Model ID |
 | `TEMPERATURE` | No | `0.2` | Sampling temperature |
 | `MAX_NEW_TOKENS` | No | `900` | Max tokens to generate |
 
@@ -79,10 +79,77 @@ python -m cvtailor_agent.cli run \
 
 Expected output:
 ```
-Application pack generated successfully.
-Output path: outputs/acme-ai-ai-engineer-application-pack.md
-Application ID: 1
+╭────────────────────────────── Results ───────────────────────────────╮
+│ Success!                                                             │
+│                                                                      │
+│ Workflow Decisions:                                                  │
+│   Evidence Quality: strong                                           │
+│   Evidence Score: 0.72                                               │
+│   Search Attempts: 1                                                 │
+│   Review Status: approved                                            │
+│   Revision Count: 0                                                  │
+│                                                                      │
+│ Output:                                                              │
+│   Path: outputs/acme-ai-ai-engineer-application-pack.md              │
+│   Application ID: 1                                                  │
+╰──────────────────────────────────────────────────────────────────────╯
 ```
+
+## Conditional LangGraph Workflow
+
+The agent uses LangGraph to implement conditional routing, making the workflow adaptive rather than linear.
+
+### Evidence Quality Routing
+
+After searching the resume for relevant evidence, the workflow scores the matches:
+
+```
+search_resume_evidence
+       ↓
+ score_evidence (calculate average score)
+       ↓
+  ┌────┴────┐
+  │ strong  │ score >= 0.50
+  │  match  │───────────────→ generate_draft
+  └────┬────┘
+       │ weak match
+       ↓
+ broaden_search_query
+       ↓
+ search_evidence_again
+       ↓
+ score_evidence (loop up to max_search_attempts)
+       ↓
+ continue_anyway ──────────→ generate_draft
+```
+
+### Review/Revision Loop
+
+After generating a draft, the workflow reviews and optionally revises it:
+
+```
+generate_draft
+       ↓
+ review_draft (LLM classifies: approved / needs_revision)
+       ↓
+  ┌────┴────┐
+  │approved │───────────────→ save_pack → log_application → END
+  └────┬────┘
+       │ needs_revision
+       ↓
+ improve_draft (increment revision_count)
+       ↓
+ review_draft (loop up to max_revisions)
+       ↓
+ max_revisions_reached ────→ save_pack → log_application → END
+```
+
+### Why LangGraph?
+
+- **Conditional branching**: Route based on evidence quality or review classification
+- **Bounded loops**: Retry search or revision with configurable limits
+- **State management**: Track scores, attempts, and revisions across nodes
+- **Debuggable**: Stream node execution to see exactly which path was taken
 
 ## Sample Data
 
